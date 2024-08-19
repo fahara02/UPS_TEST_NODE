@@ -3,6 +3,7 @@
 
 #include "Testmanager.h"
 #include "UPSTest.h"
+#include "UPSTesterSetup.h"
 
 struct SwithTestData {
 
@@ -61,8 +62,8 @@ private:
 
   SwithTestData _data;
   SwithTestData::TestSettings _config;
-  SwithTestData::TaskSettings _tasksetting;
-  SwitchTestTaskParams _taskparams;
+  SetupTask _tasksetting;
+  SetupTaskParams _taskparams;
   bool _initialized = false;
   bool _testRunning;
   bool _time_capture_running;

@@ -1,5 +1,5 @@
 #include "UPSTest.h"
-extern UPSTesterSetup* TesterSetup;
+
 // Private Constructor
 template <typename T, typename U, TestType testype>
 UPSTest<T, U, testype>::UPSTest()
@@ -9,14 +9,12 @@ UPSTest<T, U, testype>::UPSTest()
       _cfgTask(TesterSetup->taskSetup()),
       _cfgTaskParam(TesterSetup->paramSetup()),
       _cfgHardware(TesterSetup->hardwareSetup()),
-      _config(_data.testsettings),
-      _taskSetting(_data.tasksettings),
       _initialized(false),
       _testRunning(false),
       _dataCaptureRunning(false),
       _dataCaptureOk(false),
       _currentTest(0),
-      _testDuration(_config.testduration_ms) {}
+      _testDuration(_cfgTest.testDuration_ms) {}
 
 template <typename T, typename U, TestType testype>
 void UPSTest<T, U, testype>::setupPins() {
@@ -65,6 +63,67 @@ void UPSTest<T, U, testype>::configureInterrupts() {
   gpio_isr_handler_add(upspowerPin, keyISR2, NULL);
 
   Serial.print("Interrupt configuration complete\n");
+}
+
+template <typename T, typename U, TestType testype>
+TaskHandle_t UPSTest<T, U, testype>::createTask() {
+  const char* taskName = testTypeToString(T::test_type) + "task";
+  return createTask(&T::taskFunction, taskName);
+}
+
+template <typename T, typename U, TestType testype>
+TaskHandle_t UPSTest<T, U, testype>::getTaskhandle() {
+
+  TaskHandle_t* taskHandle = nullptr;
+
+  switch (T::test_type) {
+    case TestType::SwitchTest:
+      taskHandle = &switchTestTaskHandle;
+      break;
+    case TestType::BackupTimeTest:
+      taskHandle = &backupTimeTestTaskHandle;
+      break;
+    case TestType::EfficiencyTest:
+      taskHandle = &efficiencyTestTaskHandle;
+      break;
+    case TestType::InputVoltageTest:
+      taskHandle = &inputvoltageTestTaskHandle;
+      break;
+    case TestType::WaveformTest:
+      taskHandle = &waveformTestTaskHandle;
+      break;
+    case TestType::TunePWMTest:
+      taskHandle = &tunepwmTestTaskHandle;
+      break;
+    default:
+      Serial.println("Unknown test type!");
+      return NULL;
+  }
+}
+
+template <typename T, typename U, TestType testype>
+TaskHandle_t UPSTest<T, U, testype>::createTask(void (T::*taskFunction)(void*),
+                                                const char* taskName) {
+  TaskHandle_t* taskHandle = getTaskhandle();
+  // Create the task
+  xTaskCreatePinnedToCore(taskFunctionPointerToFunction(taskFunction), taskName,
+                          _cfgTask.mainTest_taskStack, _cfgTaskParam,
+                          _cfgTask.mainTest_taskIdlePriority, taskHandle,
+                          _cfgTask.mainTest_taskCore);
+
+  return taskHandle;
+}
+
+template <typename T, typename U, TestType testype>
+void UPSTest<T, U, testype>::startTest() {
+  TaskHandle_t* taskHandle = getTaskhandle();
+  vTaskResume(taskHandle);
+}
+
+template <typename T, typename U, TestType testype>
+void UPSTest<T, U, testype>::stopTest() {
+  TaskHandle_t* taskHandle = getTaskhandle();
+  vTaskSuspend(taskHandle);
 }
 
 template <typename T, typename U, TestType testype>

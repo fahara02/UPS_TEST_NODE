@@ -3,21 +3,20 @@
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 
-
 namespace Node_Core {
 UPSTesterSetup* UPSTesterSetup::instance = nullptr;
 
 UPSTesterSetup::UPSTesterSetup() {
   // Initialize LittleFS
-  if (!LittleFS.begin()) {
-    Serial.println("Failed to mount LittleFS");
-  }
+  // if (!LittleFS.begin()) {
+  //   Serial.println("Failed to mount LittleFS");
+  // }
 }
 
 UPSTesterSetup::~UPSTesterSetup() {
   if (instance == this) {
     instance = nullptr;
-    LittleFS.end();
+    // LittleFS.end();
   };
 }
 

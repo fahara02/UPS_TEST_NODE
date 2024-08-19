@@ -16,8 +16,14 @@ volatile unsigned long lastMainsTriggerTime = 0;
 volatile unsigned long lastUPSTriggerTime = 0;
 volatile bool mains_triggered = false;
 volatile bool ups_triggered = false;
+volatile bool check_ups_shutdown = false;
+const unsigned long debounceDelay = 100;
 
 TaskHandle_t modbusRTUTaskHandle = NULL;
+
+TaskHandle_t ISR_MAINS_POWER_LOSS = NULL;
+TaskHandle_t ISR_UPS_POWER_GAIN = NULL;
+TaskHandle_t ISR_UPS_POWER_LOSS = NULL;
 
 // Define the SwitchTest instance
 SwitchTest* switchTest = nullptr;
@@ -48,21 +54,23 @@ void IRAM_ATTR keyISR2(void* pvParameters) {
       ups_triggered = true;
     }
     lastUPSTriggerTime = currentTime;
-    if (check_ups_powerUp) {
-      xTaskResumeFromISR(ISR_UPS_POWER_GAIN);
-    } else {
+    if (check_ups_shutdown) {
       xTaskResumeFromISR(ISR_UPS_POWER_LOSS);
+    } else {
+      xTaskResumeFromISR(ISR_UPS_POWER_GAIN);
     }
+    // xTaskResumeFromISR(ISR_UPS_POWER_GAIN);
   }
 }
 
 void modbusRTUTask(void* pvParameters) {
 
   while (true) {
-    Serial.print("Resuming modbus task... ");
+    // Serial.print("Resuming modbus task... ");
     mb.task();
-    Serial.print("Modbus Stack High Water Mark: ");
-    Serial.println(uxTaskGetStackHighWaterMark(NULL));  // Monitor stack usage
+    // Serial.print("Modbus Stack High Water Mark: ");
+    // Serial.println(uxTaskGetStackHighWaterMark(NULL));  // Monitor stack
+    // usage
 
     vTaskDelay(pdMS_TO_TICKS(100));  // Task delay
   }
@@ -80,10 +88,6 @@ void setup() {
     switchTest->init();
     Serial.print("Switchtest initialised........");
   }
-
-  // configuring interrupt pins
-  Serial.print("configuring interrupt pins........");
-
   modbusRTU_Init();
   Serial2.begin(9600, SERIAL_8N1);
   mb.begin(&Serial2);

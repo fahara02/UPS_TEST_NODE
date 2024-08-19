@@ -45,13 +45,26 @@ struct SetupTest {
   unsigned long lastsetting_updated = 0UL;
 };
 
+// struct SetupTask {
+//   BaseType_t mainTest_taskCore = 0;
+//   BaseType_t mainsISR_taskCore = ARDUINO_RUNNING_CORE;
+//   BaseType_t upsISR_taskCore = ARDUINO_RUNNING_CORE;
+//   UBaseType_t mainTest_taskIdlePriority = 2;
+//   UBaseType_t mainsISR_taskIdlePriority = 1;
+//   UBaseType_t upsISR_taskIdlePriority = 1;
+//   uint32_t mainTest_taskStack = 12000;
+//   uint32_t mainsISR_taskStack = 12000;
+//   uint32_t upsISR_taskStack = 12000;
+//   unsigned long lastsetting_updated = 0UL;
+// };
+
 struct SetupTask {
-  BaseType_t mainTest_taskCore = 0;
-  BaseType_t mainsISR_taskCore = ARDUINO_RUNNING_CORE;
-  BaseType_t upsISR_taskCore = ARDUINO_RUNNING_CORE;
-  UBaseType_t mainTest_taskIdlePriority = 2;
-  UBaseType_t mainsISR_taskIdlePriority = 1;
-  UBaseType_t upsISR_taskIdlePriority = 1;
+  int mainTest_taskCore = 0;
+  int mainsISR_taskCore = ARDUINO_RUNNING_CORE;
+  int upsISR_taskCore = ARDUINO_RUNNING_CORE;
+  int mainTest_taskIdlePriority = 2;
+  int mainsISR_taskIdlePriority = 1;
+  int upsISR_taskIdlePriority = 1;
   uint32_t mainTest_taskStack = 12000;
   uint32_t mainsISR_taskStack = 12000;
   uint32_t upsISR_taskStack = 12000;

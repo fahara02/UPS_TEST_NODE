@@ -10,6 +10,7 @@ extern void IRAM_ATTR keyISR1(void* pvParameters);
 extern void IRAM_ATTR keyISR2(void* pvParameters);
 extern volatile bool mains_triggered;
 extern volatile bool ups_triggered;
+extern UPSTesterSetup* TesterSetup;
 using namespace Node_Core;
 
 enum TestResult { TEST_FAILED = 0, TEST_SUCESSFUL = 1 };
@@ -29,11 +30,29 @@ enum class TestType {
   WaveformTest,
   TunePWMTest,
 };
+static const char* testTypeToString(TestType type) {
+  switch (type) {
+    case TestType::SwitchTest:
+      return "SwitchTest";
+    case TestType::BackupTimeTest:
+      return "BackupTimeTest";
+    case TestType::EfficiencyTest:
+      return "EfficiencyTest";
+    case TestType::InputVoltageTest:
+      return "InputVoltageTest";
+    case TestType::WaveformTest:
+      return "WaveformTest";
+    case TestType::TunePWMTest:
+      return "TunePWMTest";
+    default:
+      return "UnknownTest";
+  }
+}
 
 template <typename T, typename U, TestType testype>
 class UPSTest {
 public:
-  static constexpr TestType type = testype;
+  static constexpr TestType test_type = testype;
   static T* getInstance() {
     if (!instance) {
       instance = new T();
@@ -52,13 +71,28 @@ public:
 
   U& data() { return _data; }
   void updateSettings() {
-    _config = _data.testsettings;
-    _taskSetting = _data.tasksettings;
+    if (TesterSetup) {
+      _cfgSpec = TesterSetup->specSetup();
+      _cfgTest = TesterSetup->testSetup();
+      _cfgTask = TesterSetup->taskSetup();
+      _cfgTaskParam = TesterSetup->paramSetup();
+      _cfgHardware = TesterSetup->hardwareSetup();
+    };
   }
-
+  static void (*taskFunctionPointerToFunction(void (T::*taskFunction)(void*)))(
+      void*) {
+    // The return type is a function pointer: void(*)(void*)
+    return [taskFunction](void* param) {
+      T* obj = static_cast<T*>(param);
+      (obj->*taskFunction)(param);
+    };
+  }
   virtual TestResult run(uint16_t testVARating = 4000,
                          unsigned long testDuration = 10000)
       = 0;
+  TaskHandle_t createTask();
+  void startTest();
+  void stopTest();
 
 protected:
   UPSTest();
@@ -74,7 +108,7 @@ protected:
   void sendEndSignal();
   void processTest(T& test);
 
-  virtual void createMainTasks() = 0;
+  TaskHandle_t createTask(void (T::*taskFunction)(void*), const char* taskName);
   virtual void createISRTasks() = 0;
 
   virtual void MainTestTask(void* pvParameters) = 0;
@@ -88,6 +122,7 @@ protected:
 
 private:
   friend class TestManager;
+  TaskHandle_t getTaskhandle();
   static T* instance;
   U _data;
   SetupSpec _cfgSpec;
@@ -95,8 +130,6 @@ private:
   SetupTask _cfgTask;
   SetupTaskParams _cfgTaskParam;
   SetupHardware _cfgHardware;
-  typename U::TestSettings& _config;
-  typename U::TaskSettings& _taskSetting;
 
   bool _initialized;
   bool _testRunning;

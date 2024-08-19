@@ -5,21 +5,24 @@ extern void IRAM_ATTR keyISR1(void* pvParameters);
 extern void IRAM_ATTR keyISR2(void* pvParameters);
 extern volatile bool mains_triggered;
 extern volatile bool ups_triggered;
-extern TaskHandle_t ISR1;
-extern TaskHandle_t ISR2;
+extern TaskHandle_t ISR_MAINS_POWER_LOSS;
+extern TaskHandle_t ISR_UPS_POWER_GAIN;
 
+using namespace Node_Core;
 // Initialize static members
 SwitchTest* SwitchTest::instance = nullptr;
 
 // Private Constructor
 SwitchTest::SwitchTest()
-    : _testRunning(false),
+    : _data(),
+      _config(),
+      _tasksetting(),
+      _taskparams(),
+      _testRunning(false),
       _time_capture_running(false),
       _time_capture_ok(false),
       _currentTest(0),
-      _testDuration(_config.testduration_ms) {
-  _taskparams.init();
-}
+      _testDuration(_config.testduration_ms) {}
 
 SwitchTest::~SwitchTest() {
   // Cleanup actions (if needed)
@@ -30,13 +33,13 @@ SwitchTest::~SwitchTest() {
       switchTestTaskHandle = NULL;
     }
     // Delete the ISR tasks
-    if (ISR1 != NULL) {
-      vTaskDelete(ISR1);
-      ISR1 = NULL;
+    if (ISR_MAINS_POWER_LOSS != NULL) {
+      vTaskDelete(ISR_MAINS_POWER_LOSS);
+      ISR_MAINS_POWER_LOSS = NULL;
     }
-    if (ISR2 != NULL) {
-      vTaskDelete(ISR2);
-      ISR2 = NULL;
+    if (ISR_UPS_POWER_GAIN != NULL) {
+      vTaskDelete(ISR_UPS_POWER_GAIN);
+      ISR_UPS_POWER_GAIN = NULL;
     }
 
     // Clear the singleton instance
@@ -83,37 +86,45 @@ void SwitchTest::init() {
 }
 void SwitchTest::createMainTasks() {
 
-  xTaskCreatePinnedToCore(instance->switchTestTask, "SwitchTestTask",
-                          instance->_tasksetting.switchtaskStack, &_taskparams,
-                          instance->_tasksetting.switchtaskPr,
-                          &switchTestTaskHandle,
-                          instance->_tasksetting.switchtaskCore);
+  xTaskCreatePinnedToCore(
+      instance->switchTestTask, "SwitchTestTask",
+      instance->_tasksetting.mainTest_taskStack, &_taskparams,
+      instance->_tasksetting.mainTest_taskIdlePriority, &switchTestTaskHandle,
+      instance->_tasksetting.mainTest_taskCore);
 }
+
+// void SwitchTest::createISRTasks() {
+//   xTaskCreatePinnedToCore(instance->onMainsPowerLossTask, "MainslossTask",
+//                           instance->_tasksetting.mainsISR_taskStack, NULL,
+//                           instance->_tasksetting.mainsISR_taskIdlePriority,
+//                           &ISR_MAINS_POWER_LOSS,
+//                           instance->_tasksetting.mainsISR_taskCore);
+//   xTaskCreatePinnedToCore(instance->onUPSPowerGainTask, "UPSgainTask",
+//                           instance->_tasksetting.upsISR_taskStack, NULL,
+//                           instance->_tasksetting.upsISR_taskIdlePriority,
+//                           &ISR_UPS_POWER_GAIN,
+//                           instance->_tasksetting.upsISR_taskCore);
+// }
 
 void SwitchTest::createISRTasks() {
   xTaskCreatePinnedToCore(instance->onMainsPowerLossTask, "MainslossTask",
-                          instance->_tasksetting.mainsISRtaskStack, NULL,
-                          instance->_tasksetting.mainsISRtaskPr,
-                          &ISR_MAINS_POWER_LOSS,
-                          instance->_tasksetting.mainsISRtaskCore);
-  xTaskCreatePinnedToCore(instance->onUPSPowerGainTask, "UPSgainTask",
-                          instance->_tasksetting.upsISRtaskStack, NULL,
-                          instance->_tasksetting.upsISRtaskPr,
-                          &ISR_UPS_POWER_GAIN,
-                          instance->_tasksetting.upsISRtaskCore);
+                          12000, NULL, 1, &ISR_MAINS_POWER_LOSS,
+                          ARDUINO_RUNNING_CORE);
+  xTaskCreatePinnedToCore(instance->onUPSPowerGainTask, "UPSgainTask", 12000,
+                          NULL, 1, &ISR_UPS_POWER_GAIN, ARDUINO_RUNNING_CORE);
 }
 
 // Function for SwitchTest task
 void SwitchTest::switchTestTask(void* pvParameters) {
   if (instance) {
     while (true) {
-      SwitchTestTaskParams* params = (SwitchTestTaskParams*)pvParameters;
+      SetupTaskParams* params = (SetupTaskParams*)pvParameters;
       Serial.print("Switchtask VA rating is: ");
-      Serial.println(params->testVARating);
+      Serial.println(params->task_TestVARating);
       Serial.print("Switchtask duration is: ");
-      Serial.println(params->testDuration);
+      Serial.println(params->task_testDuration_ms);
 
-      instance->run(params->testVARating, params->testDuration);
+      instance->run(params->task_TestVARating, params->task_testDuration_ms);
       Serial.print("Switch Stack High Water Mark: ");
       Serial.println(uxTaskGetStackHighWaterMark(NULL));  // Monitor stack usage
       vTaskDelay(pdMS_TO_TICKS(100));  // Delay to prevent tight loop
@@ -196,10 +207,8 @@ void SwitchTest::setupPins() {
 
 // Interrupt configuration
 void SwitchTest::configureInterrupts() {
-
+  Serial.println("configuring button");
   gpio_num_t mainpowerPin = static_cast<gpio_num_t>(SENSE_MAINS_POWER_PIN);
-
-  Serial.print("configuring button\n");
   gpio_set_intr_type(mainpowerPin, GPIO_INTR_NEGEDGE);
 
   gpio_num_t upspowerPin = static_cast<gpio_num_t>(SENSE_UPS_POWER_PIN);
@@ -209,7 +218,7 @@ void SwitchTest::configureInterrupts() {
   gpio_isr_handler_add(mainpowerPin, keyISR1, NULL);
   gpio_isr_handler_add(upspowerPin, keyISR2, NULL);
 
-  Serial.print("config complete\n");
+  Serial.println("config complete");
 }
 
 // Start the test

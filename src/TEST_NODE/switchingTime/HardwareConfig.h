@@ -21,7 +21,6 @@
 #define LOAD_PWM_PIN 13
 
 const uint16_t maxVARating = 4000;
-const unsigned long debounceDelay = 100;
 
 struct switchTestConfig {
   uint8_t max_retest = 3;
