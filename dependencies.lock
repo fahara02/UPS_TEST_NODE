@@ -1,0 +1,15 @@
+dependencies:
+  esp_littlefs:
+    component_hash: null
+    source:
+      path: D:\_0_DEV_SOFTWARE\PIO_ESPIDF\UPS_TESTER_PROJECT\UPS_TEST_NODE\managed_components\esp_littlefs
+      type: local
+    version: 1.14.8
+  idf:
+    component_hash: null
+    source:
+      type: idf
+    version: 4.4.6
+manifest_hash: 0873d0434312778e84e5c91c5a974b22b7b0f5282cc7efa686e0174fc0908508
+target: esp32
+version: 1.0.0
